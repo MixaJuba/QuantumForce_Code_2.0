@@ -58,12 +58,14 @@
 2. Використовуй приклади як шаблони
 3. Дотримуйся контрактів інтерфейсів
 4. Додай KDoc коментарі
+5. **Інтегруй AI-діагностику** - додай інтелектуальні функції аналізу даних, прогнозування несправностей та рекомендацій ремонту
 
 ### Етап 4: Інтеграція (5-10 хв)
 1. Перевір залежності між модулями
 2. Додай Hilt DI модулі
 3. Оновлення build.gradle.kts
 4. Тестування інтеграції
+5. **Тестування AI-функцій** - валідуй точність рекомендацій та прогнозів
 
 ---
 
@@ -175,6 +177,36 @@ QuantumForce_Code/
 
 ## 🛠️ Інструкції для кожного типу модуля
 
+### AI-діагностика - Новий пріоритет #0
+**Що робити:**
+1. **Інтегруй AI-аналіз** у всі Use Cases та Repositories:
+   - Додай методи для інтелектуального аналізу DTC
+   - Реалізуй прогнозування несправностей на основі патернів
+   - Створи рекомендації ремонту з пріоритетами
+
+2. **AI-алгоритми**:
+   ```kotlin
+   class AiDiagnosticUseCase(
+       private val dtcRepository: DtcRepository,
+       private val aiEngine: AiEngine // Новий інтерфейс
+   ) {
+       suspend fun analyzeDtcs(vin: String): AiAnalysisResult {
+           val dtcs = dtcRepository.getDtcs(vin)
+           return aiEngine.analyze(dtcs)
+       }
+   }
+   ```
+
+3. **Локальні моделі ML**:
+   - Використовуй TensorFlow Lite для офлайн-аналізу
+   - Тренуй моделі на історичних даних несправностей
+   - Інтегруй з хмарною синхронізацією для навчання
+
+**Важливо:**
+- AI-функції повинні працювати офлайн
+- Точність рекомендацій > 85%
+- Обробляй edge cases (нові DTC, незвичні комбінації)
+
 ### Domain Layer (core/domain) - Ваш пріоритет #1
 
 **Що робити:**
@@ -227,7 +259,7 @@ QuantumForce_Code/
    interface MyDao {
        @Query("SELECT * FROM table_name")
        suspend fun getAll(): List<MyEntity>
-       
+
        @Insert(onConflict = OnConflictStrategy.REPLACE)
        suspend fun insert(entity: MyEntity)
    }
@@ -298,11 +330,11 @@ QuantumForce_Code/
        private val port: Port
    ) : ObdInterface {
        private var currentProtocol: ObdProtocol? = null
-       
+
        override suspend fun initialize(): Result<Boolean> {
            // Ініціалізація адаптера
        }
-       
+
        override suspend fun sendCommand(command: ObdCommand): Result<ObdResponse> {
            // Відправка команди та парсинг відповіді
        }
@@ -340,10 +372,10 @@ QuantumForce_Code/
    ) : ViewModel() {
        private val _uiState = MutableStateFlow(MyUiState())
        val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
-       
+
        private val _effects = MutableSharedFlow<MyEffect>()
        val effects: SharedFlow<MyEffect> = _effects.asSharedFlow()
-       
+
        fun handleEvent(event: MyEvent) {
            // Обробка подій
        }
@@ -365,7 +397,7 @@ QuantumForce_Code/
        object Load : MyEvent()
        data class Select(val item: Item) : MyEvent()
    }
-   
+
    sealed class MyEffect {
        data class ShowToast(val message: String) : MyEffect()
        object NavigateBack : MyEffect()
@@ -394,13 +426,13 @@ QuantumForce_Code/
        onNavigate: () -> Unit
    ) {
        val uiState by viewModel.uiState.collectAsState()
-       
+
        LaunchedEffect(Unit) {
            viewModel.effects.collect { effect ->
                // Обробка effects
            }
        }
-       
+
        Scaffold(...) {
            // UI content
        }
@@ -441,7 +473,7 @@ QuantumForce_Code/
        id("com.google.dagger.hilt.android")
        kotlin("kapt")
    }
-   
+
    dependencies {
        implementation("com.google.dagger:hilt-android:2.48")
        kapt("com.google.dagger:hilt-compiler:2.48")
@@ -459,13 +491,13 @@ QuantumForce_Code/
    @Module
    @InstallIn(SingletonComponent::class)
    object DataModule {
-       
+
        @Provides
        @Singleton
        fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
            return AppDatabase.create(context)
        }
-       
+
        @Provides
        fun provideDtcRepository(
            database: AppDatabase,
@@ -554,15 +586,15 @@ com.quantumforce_code
 ```kotlin
 /**
  * Короткий опис українською.
- * 
+ *
  * Призначення: Детальний опис призначення класу/методу.
  * Принципи: Які SOLID принципи використовуються.
- * 
+ *
  * Приклад використання:
  * ```
  * val result = myFunction(params)
  * ```
- * 
+ *
  * @param param опис параметра
  * @return опис результату
  */
@@ -593,10 +625,10 @@ override suspend fun getData(): Data = withContext(Dispatchers.IO) {
 fun loadData() {
     viewModelScope.launch {
         _uiState.update { it.copy(isLoading = true) }
-        
+
         val result = useCase(params)
-        
-        _uiState.update { 
+
+        _uiState.update {
             it.copy(
                 isLoading = false,
                 data = result.getOrNull(),
@@ -689,8 +721,8 @@ fun loadData() {
 
 ---
 
-**Автор**: RepoBuilder AI Agent  
-**Версія**: 1.0.0  
+**Автор**: RepoBuilder AI Agent
+**Версія**: 1.0.0
 **Останнє оновлення**: 2024
 
 **Для питань**: Перечитай документацію, там є відповіді на 95% питань! 🚀

@@ -8,9 +8,9 @@
 
 ## 🎯 Загальні принципи безпеки | General Security Principles
 
-QuantumForce_Code - професійний інструмент для автомобільної діагностики, який працює з критичними системами транспортних засобів. Безпека є пріоритетом номер один.
+QuantumForce_Code - професійний інструмент для автомобільної діагностики, який працює з критичними системами транспортних засобів, включаючи електромобілі та ADAS системи. Безпека є пріоритетом номер один, особливо при роботі з високовольтними батареями та автономними системами.
 
-*QuantumForce_Code is a professional automotive diagnostic tool that works with critical vehicle systems. Security is priority number one.*
+*QuantumForce_Code is a professional automotive diagnostic tool that works with critical vehicle systems, including electric vehicles and ADAS systems. Security is priority number one, especially when working with high-voltage batteries and autonomous systems.*
 
 **Основні принципи:**
 - 🔒 Безпека на всіх рівнях (від коду до інфраструктури)
@@ -18,6 +18,8 @@ QuantumForce_Code - професійний інструмент для авто�
 - 🔐 Defense in Depth - кілька рівнів захисту
 - 📊 Transparency - відкритість про вразливості та їх виправлення
 - ⚡ Rapid Response - швидке реагування на інциденти
+- ⚠️ **EV Safety First** - додаткові заходи для високовольтних систем
+- 🤖 **AI Security** - захист AI-моделей та даних навчання
 
 ---
 
@@ -143,7 +145,7 @@ android {
         rootProject.file("local.properties").inputStream().use {
             localProperties.load(it)
         }
-        
+
         buildConfigField(
             "String",
             "MAPS_API_KEY",
@@ -234,7 +236,7 @@ git secrets --register-aws  # для AWS keys
 **Приклад:**
 ```kotlin
 // ✅ Правильно
-if (ContextCompat.checkSelfPermission(context, BLUETOOTH_CONNECT) 
+if (ContextCompat.checkSelfPermission(context, BLUETOOTH_CONNECT)
     == PackageManager.PERMISSION_GRANTED) {
     // Використовуємо Bluetooth
 }
@@ -392,7 +394,7 @@ android {
 
 **Захист:**
 - ❌ Не лишаємо debug logs в release
-- ❌ Не включаємо test APIs в production
+- ❌ Не включаємо test APIs in production
 - ✅ Різні build types (debug/release)
 
 ```kotlin
@@ -403,6 +405,59 @@ if (BuildConfig.DEBUG) {
 
 // ❌ Неправильно
 Timber.d("User VIN: $vin") // Витік VIN в production logs!
+```
+
+#### EV-Specific Security (Новий розділ)
+**Ризик:** Небезпека при роботі з високовольтними системами
+
+**Захист:**
+- ✅ Валідація всіх команд до відправки на EV системи
+- ✅ Безпека переривання операцій при помилках
+- ✅ Логування всіх дій з EV системами (без чутливих даних)
+- ✅ Фізичні застереження для користувачів
+- ✅ Автоматичне відключення при аномаліях напруги
+
+**Приклад:**
+```kotlin
+// ✅ Правильно - EV safety checks
+class EvSafetyManager {
+    fun validateCommand(command: EvCommand): Result<Unit> {
+        return when {
+            command.voltage > MAX_SAFE_VOLTAGE -> Result.failure(SecurityException("Voltage too high"))
+            command.isHighCurrent && !userConfirmed -> Result.failure(SecurityException("High current requires confirmation"))
+            else -> Result.success(Unit)
+        }
+    }
+}
+```
+
+#### AI Security (Новий розділ)
+**Ризик:** Атаки на AI-моделі та витік навчальних даних
+
+**Захист:**
+- ✅ Валідація всіх входів до AI-моделей
+- ✅ Захист від adversarial inputs
+- ✅ Шифрування навчальних даних
+- ✅ Регулярні аудити AI-рішень
+- ✅ Fallback до rule-based логіки при AI помилках
+
+**Приклад:**
+```kotlin
+// ✅ Правильно - AI input validation
+class AiDiagnosticEngine {
+    fun analyzeDtcCodes(codes: List<DtcCode>): AiAnalysisResult {
+        // Валідація входів
+        require(codes.size <= MAX_DTC_COUNT) { "Too many DTC codes" }
+        require(codes.all { it.isValid() }) { "Invalid DTC code detected" }
+
+        // Adversarial input detection
+        if (containsSuspiciousPatterns(codes)) {
+            return AiAnalysisResult.fallback()
+        }
+
+        return performAnalysis(codes)
+    }
+}
 ```
 
 ---
@@ -509,27 +564,27 @@ plugins {
    ├─ Automated scanners
    ├─ Security Agent
    └─ User reports
-   
+
 2. Assessment (Оцінка)
    ├─ Severity (CVSS score)
    ├─ Impact (скільки користувачів)
    └─ Exploitability (як легко експлуатувати)
-   
+
 3. Containment (Локалізація)
    ├─ Disable vulnerable feature (якщо можливо)
    ├─ Rotate secrets
    └─ Block malicious actors
-   
+
 4. Remediation (Виправлення)
    ├─ Develop fix
    ├─ Test thoroughly
    └─ Deploy patch
-   
+
 5. Recovery (Відновлення)
    ├─ Monitor for re-occurrence
    ├─ Verify fix effectiveness
    └─ Update security measures
-   
+
 6. Post-Incident (Після інциденту)
    ├─ Root cause analysis
    ├─ Document lessons learned
@@ -606,14 +661,14 @@ plugins {
 
 ## 🔄 Оновлення політики | Policy Updates
 
-**Версія:** 1.0.0  
-**Дата:** 2024  
+**Версія:** 1.0.0
+**Дата:** 2024
 **Наступний review:** Кожні 6 місяців або після major incident
 
 **Історія змін:**
 - v1.0.0 (2024) - Початкова версія політики
 
-**Maintainer:** RepoBuilder AI Agent  
+**Maintainer:** RepoBuilder AI Agent
 **Reviewers:** Security Agent, Architecture Agent
 
 ---

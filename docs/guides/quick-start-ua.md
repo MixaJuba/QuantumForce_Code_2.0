@@ -23,6 +23,12 @@
 # 3. Налаштуйте GitHub Copilot (опціонально, але ДУЖЕ рекомендовано)
 # Підписка: https://github.com/features/copilot
 # Активація в Android Studio: Settings -> Plugins -> GitHub Copilot
+
+# 4. Ознайомтеся з українським контекстом автомобільної діагностики
+# - EV ринок росте на 142,9% (станом на серпень 2025)
+# - Потрібна підтримка імпортованих авто (Volkswagen, Toyota, BMW)
+# - Незалежність від дилерських систем критична
+# - Локалізація інтерфейсу UA/EN обов'язкова
 ```
 
 ### ✅ Крок 2: Створіть Проєкт (1 година)
@@ -212,7 +218,7 @@ object SampleData {
             timestamp = System.currentTimeMillis()
         )
     )
-    
+
     val testVehicle = Vehicle(
         vin = "WVWZZZ1JZXW123456",
         make = "Volkswagen",
@@ -316,10 +322,10 @@ import time
 
 def main():
     ser = serial.Serial('COM3', 38400)  # Змініть на ваш порт
-    
+
     while True:
         data = ser.readline().decode('utf-8').strip()
-        
+
         if data == "ATZ":
             ser.write(b"ELM327 v2.2\r\r>")
         elif data == "ATE0":
@@ -333,7 +339,7 @@ def main():
             ser.write(b"43 02 01 43 01 33\r\r>")  # P0143, P0133
         else:
             ser.write(b"?\r\r>")
-        
+
         time.sleep(0.1)
 
 if __name__ == "__main__":
@@ -348,14 +354,14 @@ if __name__ == "__main__":
 class DTCViewModel @Inject constructor(
     private val obdRepository: OBDRepository
 ) : ViewModel() {
-    
+
     private val _dtcList = MutableStateFlow<List<DTC>>(emptyList())
     val dtcList: StateFlow<List<DTC>> = _dtcList.asStateFlow()
-    
+
     fun scanDTCs() {
         viewModelScope.launch {
             _isLoading.value = true
-            
+
             obdRepository.readDTCs()
                 .onSuccess { dtcs ->
                     _dtcList.value = dtcs
@@ -364,7 +370,7 @@ class DTCViewModel @Inject constructor(
                 .onFailure { error ->
                     _error.value = error.message
                 }
-            
+
             _isLoading.value = false
         }
     }
@@ -395,23 +401,26 @@ class DTCViewModel @Inject constructor(
 
 ## Наступні Кроки (Тиждень 2+)
 
-### Тиждень 2: Покращення OBD-II
+### Тиждень 2: Покращення OBD-II та EV підтримка
 - Додати Live Data monitoring
 - Реалізувати Clear DTCs
 - Додати Freeze Frame
+- Почати підтримку CAN/UDS протоколів для EV
 - Тестування з реальним адаптером
 
-### Тиждень 3-4: Більше Функцій
-- Додати 5 популярних марок авто
-- Vehicle identification
-- Report generation
-- Settings screen
+### Тиждень 3-4: Розширення функціональності
+- Додати 5 популярних марок авто (Volkswagen, Toyota, BMW, Mercedes, Hyundai)
+- Vehicle identification з українським контекстом
+- Report generation з українською мовою
+- Settings screen з вибором мови (UA/EN)
+- Почати AI-діагностику (базові рекомендації)
 
-### Місяць 2: Тестування
+### Місяць 2: Тестування та ADAS
 - Купити OBD-II адаптер (ELM327 Bluetooth ~$20)
-- Тестувати на власному авто
-- Виправлення багів
-- Покращення UI/UX
+- Тестувати на власному авто (враховуючи імпортовані моделі)
+- Почати підтримку ADAS калібрування
+- Виправлення багів з урахуванням українського ринку
+- Покращення UI/UX для мобільних СТО
 
 ---
 
@@ -541,7 +550,7 @@ Give me a prioritized list of tasks for this week.
 
 **Для коду:**
 ```
-I need to implement [feature]. 
+I need to implement [feature].
 My current code: [paste code]
 Requirements: [list requirements]
 

@@ -296,10 +296,10 @@ fun `UseCase returns DTCs from repository`() = runTest {
     // Arrange
     val fakeRepo = FakeDtcRepository()
     val useCase = GetVehicleDtcsUseCase(fakeRepo)
-    
+
     // Act
     val result = useCase("VIN123")
-    
+
     // Assert
     assertThat(result.isSuccess).isTrue()
 }
@@ -311,9 +311,9 @@ fun `UseCase returns DTCs from repository`() = runTest {
 fun `Repository fetches from database correctly`() = runTest {
     val db = createInMemoryDatabase()
     val repo = DtcRepositoryImpl(db.dtcDao(), DtcMapper())
-    
+
     val result = repo.getDtcs("VIN123")
-    
+
     assertThat(result.isSuccess).isTrue()
 }
 ```
@@ -380,6 +380,31 @@ fun `Repository fetches from database correctly`() = runTest {
 - Інтеграція з Jetpack
 - Compile-time safety
 - Простіший за Dagger
+
+### ✅ Підтримка EV/Гібридів та сучасних протоколів
+- **CAN, UDS, DoIP**: Для діагностики електромобілів та гібридів з високовольтними батареями
+- **Модульна архітектура**: Легке додавання нових протоколів (наприклад, для 800В систем у майбутньому)
+- **Безпека**: Шифрування даних високовольтних систем згідно з галузевими стандартами
+
+### ✅ AI-діагностика та інтелектуальні функції
+- **AI-Powered Features**: Автоматизований пошук несправностей, інтелектуальна інтерпретація DTC, прогнозування поломок
+- **Інтеграція з ML-моделями**: Локальні моделі для офлайн-аналізу, хмарна синхронізація для навчання
+- **Рекомендації**: Підказки для ремонту на основі комбінації кодів та датчиків
+
+### ✅ ADAS-калібрування (планується)
+- **Модуль для калібрування**: Камери, радари, системи допомоги водію
+- **Тестовність**: Окремий модуль з симуляцією для розробки та тестування
+- **Інтеграція**: З хмарними сервісами для оновлення калібрувальних даних
+
+### ✅ Хмарні сервіси та автономність
+- **Хмарна синхронізація**: Збереження логів, телеметрія, бекапи
+- **Автономність**: Локальна база даних 50,000+ кодів, офлайн-оновлення
+- **Український контекст**: Локалізація інтерфейсу (UA/EN), підтримка імпортованих авто
+
+### ✅ AI-driven розробка
+- **Команда AI-агентів**: Cursor (PM/рев'ю), Copilot (домен), Claude (UI/відлагодження), Codex (інфраструктура), Gemini (QA/документація)
+- **Швидкість та якість**: Паралельна розробка, подвійний контроль коду
+- **Масштабованість**: Легке додавання нових агентів для нових функцій
 
 ---
 
@@ -451,7 +476,7 @@ interface DtcEverything {
 class GetVehicleDtcsUseCase(
     private val repository: DtcRepository
 ) {
-    suspend operator fun invoke(vin: String) = 
+    suspend operator fun invoke(vin: String) =
         repository.getDtcs(vin)
 }
 
@@ -513,8 +538,8 @@ class VehicleManager {
 
 ---
 
-**Версія:** 2.0.0  
-**Дата:** 2024  
+**Версія:** 2.0.0
+**Дата:** 2024
 **Автор:** RepoBuilder AI Agent
 
 **Повернутися до:** [Головна документація](index.md)

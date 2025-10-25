@@ -8,9 +8,9 @@
 
 ## 🎯 Філософія тестування | Testing Philosophy
 
-Тестування в QuantumForce_Code - це не просто перевірка що код працює, а **гарантія якості** професійного інструменту для автомобільної діагностики. Погані тести можуть призвести до неправильної діагностики, що може коштувати грошей і репутації.
+Тестування в QuantumForce_Code - це не просто перевірка що код працює, а **гарантія якості** професійного інструменту для автомобільної діагностики, включаючи критичні системи EV та ADAS. Погані тести можуть призвести до неправильної діагностики, що може коштувати грошей і репутації, особливо при роботі з високовольтними батареями та автономними системами.
 
-*Testing in QuantumForce_Code is not just checking that code works, but a **quality guarantee** for a professional automotive diagnostic tool. Poor tests can lead to incorrect diagnostics, which can cost money and reputation.*
+*Testing in QuantumForce_Code is not just checking that code works, but a **quality guarantee** for a professional automotive diagnostic tool, including critical EV and ADAS systems. Poor tests can lead to incorrect diagnostics, which can cost money and reputation, especially when working with high-voltage batteries and autonomous systems.*
 
 **Основні принципи:**
 - 🎯 **Якість > Кількість** - краще 50 хороших тестів ніж 500 поганих
@@ -18,6 +18,9 @@
 - 🔄 **Repeatability** - тести завжди дають однаковий результат
 - 📊 **Coverage** - aim for 70-80%+ для критичних модулів
 - 🚫 **No Flaky Tests** - тести не мають випадково падати
+- 🤖 **AI Code Testing** - спеціальні тести для AI-генерованого коду
+- ⚡ **EV Safety Testing** - обов'язкові тести безпеки високовольтних операцій
+- 🚗 **ADAS Validation** - валідація калібрувальних процесів
 
 ---
 
@@ -115,6 +118,7 @@ src/
 - User interactions (clicks, input)
 - Navigation flows
 - Critical user scenarios
+- EV/ADAS specific UI (safety warnings, calibration flows)
 
 **Інструменти:**
 - Compose Testing
@@ -151,10 +155,10 @@ fun `getDtcs returns list of DTCs when vehicle exists`() {
         Dtc("P0420", "Catalyst System Low Efficiency")
     ))
     val useCase = GetVehicleDtcsUseCase(fakeRepository)
-    
+
     // Act (Дія)
     val result = runBlocking { useCase("VIN123") }
-    
+
     // Assert (Перевірка)
     assertThat(result).isNotEmpty()
     assertThat(result).hasSize(2)
@@ -172,10 +176,10 @@ fun `given invalid VIN when getDtcs called then returns empty list`() {
     // Given
     val repository = FakeDtcRepository()
     val useCase = GetVehicleDtcsUseCase(repository)
-    
+
     // When
     val result = runBlocking { useCase("INVALID_VIN") }
-    
+
     // Then
     assertThat(result).isEmpty()
 }
@@ -190,29 +194,29 @@ fun `given invalid VIN when getDtcs called then returns empty list`() {
 class GetVehicleDtcsUseCaseTest {
     // Test dispatcher для контролю часу
     private val testDispatcher = StandardTestDispatcher()
-    
+
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
     }
-    
+
     @After
     fun tearDown() {
         Dispatchers.resetMain()
     }
-    
+
     @Test
     fun `useCase executes on correct dispatcher`() = runTest {
         val repository = FakeDtcRepository()
         val useCase = GetVehicleDtcsUseCase(repository)
-        
+
         val job = launch {
             useCase("VIN123")
         }
-        
+
         // Контролюємо виконання
         advanceUntilIdle()
-        
+
         assertThat(repository.wasInvoked).isTrue()
     }
 }
@@ -227,18 +231,18 @@ class GetVehicleDtcsUseCaseTest {
 fun `ViewModel emits correct states`() = runTest {
     val repository = FakeDtcRepository()
     val viewModel = DtcViewModel(GetVehicleDtcsUseCase(repository))
-    
+
     // Turbine для тестування Flow
     viewModel.state.test {
         // Initial state
         assertThat(awaitItem()).isEqualTo(DtcState.Loading)
-        
+
         // Trigger action
         viewModel.loadDtcs("VIN123")
-        
+
         // Loading state
         assertThat(awaitItem()).isEqualTo(DtcState.Loading)
-        
+
         // Success state
         val successState = awaitItem() as DtcState.Success
         assertThat(successState.dtcs).hasSize(2)
@@ -410,11 +414,11 @@ class DtcScreenTest {
             .onNodeWithText("P0301")
             .assertExists()
             .assertIsDisplayed()
-        
+
         composeTestRule
             .onNodeWithText("Cylinder 1 Misfire")
             .assertExists()
-        
+
         composeTestRule
             .onNodeWithText("P0420")
             .assertExists()
@@ -511,30 +515,30 @@ class DtcScreenTest {
 dependencies {
     // JUnit 5 (latest)
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-    
+
     // MockK (Kotlin mocking)
     testImplementation("io.mockk:mockk:1.13.8")
     testImplementation("io.mockk:mockk-android:1.13.8")
-    
+
     // Truth (better assertions)
     testImplementation("com.google.truth:truth:1.1.5")
-    
+
     // Coroutines Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    
+
     // Turbine (Flow testing)
     testImplementation("app.cash.turbine:turbine:1.0.0")
-    
+
     // Robolectric (Android without emulator)
     testImplementation("org.robolectric:robolectric:4.11")
-    
+
     // Room testing
     testImplementation("androidx.room:room-testing:2.6.0")
-    
+
     // Compose Testing
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.5.4")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.5.4")
-    
+
     // Hilt Testing
     androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
     kaptAndroidTest("com.google.dagger:hilt-android-compiler:2.48")
@@ -567,6 +571,8 @@ android {
 - 🎯 **Data layer**: 70%+ (Repository, DAOs)
 - 🎯 **ViewModels**: 75%+ (UI logic)
 - 🎯 **Protocol parsers**: 85%+ (critical parsing logic)
+- 🎯 **AI components**: 80%+ (ML models, inference logic)
+- 🎯 **EV/ADAS modules**: 85%+ (safety-critical code)
 - 📊 **UI layer**: 50%+ (Compose testing важко)
 - 📊 **Transport layer**: 60%+ (hardware залежність)
 
@@ -595,18 +601,18 @@ jacoco {
 
 tasks.register<JacocoReport>("jacocoTestReport") {
     dependsOn("testDebugUnitTest")
-    
+
     reports {
         xml.required.set(true)
         html.required.set(true)
     }
-    
+
     sourceDirectories.setFrom(files("src/main/kotlin"))
     classDirectories.setFrom(files("build/tmp/kotlin-classes/debug"))
     executionData.setFrom(fileTree(buildDir) {
         include("**/*.exec", "**/*.ec")
     })
-    
+
     // Exclude generated files
     classDirectories.setFrom(files(classDirectories.files.map {
         fileTree(it) {
@@ -688,38 +694,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        
+
       - name: Run Unit Tests
         run: ./gradlew test
-        
+
       - name: Generate Coverage Report
         run: ./gradlew jacocoTestReport
-        
+
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: ./build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
           fail_ci_if_error: true
-          
+
       - name: Run Lint
         run: ./gradlew lint
-        
+
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-results
           path: '**/build/test-results/**/*.xml'
-          
+
       - name: Comment Coverage on PR
         uses: madrapps/jacoco-report@v1.3
         with:
@@ -757,7 +763,7 @@ jobs:
 tasks.register("prGate") {
     group = "verification"
     description = "Run all checks required for PR"
-    
+
     dependsOn(
         "test",                  // Unit tests
         "jacocoTestReport",      // Coverage
@@ -765,7 +771,7 @@ tasks.register("prGate") {
         "detekt",                // Kotlin linting
         "assembleDebug"          // Build check
     )
-    
+
     doLast {
         println("✅ All PR gates passed!")
     }
@@ -788,7 +794,7 @@ tasks.register("prGate") {
    // ✅ Good - tests behavior
    @Test
    fun `user can see list of DTCs after scan`()
-   
+
    // ❌ Bad - tests implementation
    @Test
    fun `repository.getDtcs is called with correct parameter`()
@@ -799,10 +805,10 @@ tasks.register("prGate") {
    // ✅ Good
    @Test
    fun `returns error when VIN is empty`()
-   
+
    @Test
    fun `returns error when VIN is invalid format`()
-   
+
    // ❌ Bad
    @Test
    fun `validates VIN correctly`() {
@@ -815,7 +821,7 @@ tasks.register("prGate") {
    // ✅ Good
    @Test
    fun `clears all DTCs when clear button is clicked and user confirms`()
-   
+
    // ❌ Bad
    @Test
    fun `test1`()
@@ -854,7 +860,7 @@ tasks.register("prGate") {
        Thread.sleep(1000) // Flaky!
        assert(viewModel.data.isNotEmpty())
    }
-   
+
    // ✅ Good
    @Test
    fun test() = runTest {
@@ -877,7 +883,7 @@ tasks.register("prGate") {
    // ❌ Bad
    @Test
    fun test1_setupData() { ... }
-   
+
    @Test
    fun test2_useData() { /* depends on test1 */ }
    ```
@@ -912,6 +918,8 @@ tasks.register("prGate") {
 - [ ] Перевірити якість тестів (чи тестують поведінку)
 - [ ] Перевірити coverage report
 - [ ] Перевірити що немає test pollution
+- [ ] Для AI-генерованого коду: перевірити що є тести на edge cases та валідацію
+- [ ] Для EV/ADAS коду: перевірити що є тести на safety-critical сценарії
 
 ---
 
@@ -947,10 +955,20 @@ tasks.register("prGate") {
 - Тестуй публічні API, не приватні методи
 - Використовуй JaCoCo для виявлення untested code
 
+**AI-генерований код?**
+- Завжди додавай тести на валідацію входів
+- Тестуй edge cases та adversarial inputs
+- Перевіряй fallback логіку при помилках AI
+
+**EV/ADAS код?**
+- Тестуй safety-critical сценарії
+- Перевіряй валідацію високовольтних команд
+- Тестуй emergency shutdown процедури
+
 ---
 
-**Версія:** 1.0.0  
-**Дата:** 2024  
+**Версія:** 1.0.0
+**Дата:** 2024
 **Maintainer:** Testing Agent + RepoBuilder
 
 **Повернутися до:** [Головна документація](index.md)

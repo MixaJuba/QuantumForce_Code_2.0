@@ -42,18 +42,28 @@
 
 ## 🏗️ Архітектура Системи / System Architecture
 
-### 1. Трьохрівнева Архітектура / Three-Tier Architecture
+### 1. Трьохрівнева Архітектура з EV/ADAS Підтримкою / Three-Tier Architecture with EV/ADAS Support
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    PRESENTATION LAYER                        │
-│              (Android UI - Kotlin/Java)                      │
+│              (Android UI - Kotlin/Jetpack Compose)           │
+│     • AI-діагностика інтерфейс / AI diagnostics UI           │
+│     • EV батарея моніторинг / EV battery monitoring         │
+│     • ADAS калібрування / ADAS calibration                   │
 ├─────────────────────────────────────────────────────────────┤
 │                    BUSINESS LOGIC LAYER                      │
 │         (Protocol Handlers, Data Processing, AI)             │
+│     • CAN/UDS/DoIP протоколи / CAN/UDS/DoIP protocols        │
+│     • AI аналіз несправностей / AI fault analysis            │
+│     • EV системи управління / EV system management           │
+│     • ADAS сенсори / ADAS sensors                            │
 ├─────────────────────────────────────────────────────────────┤
 │                    DATA ACCESS LAYER                         │
 │        (Hardware Interface, Database, Cloud Sync)            │
+│     • EV високовольтна безпека / EV high-voltage safety      │
+│     • ADAS калібрувальні дані / ADAS calibration data         │
+│     • AI моделі та навчання / AI models & training           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -147,23 +157,23 @@ dependencies {
     // Jetpack Compose для UI
     implementation("androidx.compose.ui:ui:1.5.4")
     implementation("androidx.compose.material3:material3:1.1.2")
-    
+
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.5")
-    
+
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
-    
+
     // Корутини для асинхронності
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    
+
     // Bluetooth/USB комунікація
     implementation("com.github.mik3y:usb-serial-for-android:3.6.0")
-    
+
     // Database
     implementation("androidx.room:room-runtime:2.6.0")
     implementation("androidx.room:room-ktx:2.6.0")
-    
+
     // Dependency Injection
     implementation("com.google.dagger:hilt-android:2.48")
 }
@@ -291,17 +301,17 @@ Include:
 sealed class OBDProtocol {
     abstract val identifier: String
     abstract val baudRate: Int
-    
+
     object ISO9141_2 : OBDProtocol() {
         override val identifier = "ISO 9141-2"
         override val baudRate = 10400
     }
-    
+
     object ISO14230_4 : OBDProtocol() {
         override val identifier = "ISO 14230-4 (KWP2000)"
         override val baudRate = 10400
     }
-    
+
     object ISO15765_4_CAN : OBDProtocol() {
         override val identifier = "ISO 15765-4 (CAN)"
         override val baudRate = 500000
@@ -314,28 +324,28 @@ class ELM327Connector(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private var currentProtocol: OBDProtocol? = null
-    
+
     suspend fun connect(): Result<Boolean> = withContext(dispatcher) {
         try {
             // Reset adapter
             sendCommand("ATZ").getOrThrow()
             delay(1000)
-            
+
             // Turn off echo
             sendCommand("ATE0").getOrThrow()
-            
+
             // Auto protocol detection
             sendCommand("ATSP0").getOrThrow()
-            
+
             // Verify connection with 0100 PID
             val response = sendCommand("0100").getOrThrow()
-            
+
             Result.success(response.isNotEmpty())
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-    
+
     suspend fun readDTCs(): Result<List<DTC>> = withContext(dispatcher) {
         try {
             val response = sendCommand("03").getOrThrow()
@@ -345,7 +355,7 @@ class ELM327Connector(
             Result.failure(e)
         }
     }
-    
+
     private suspend fun sendCommand(command: String): Result<String> {
         return try {
             ioStream.write("$command\r")
@@ -521,7 +531,7 @@ class AutomotiveDiagnosticAgent:
             embedding_function=self.embeddings
         )
         self.llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0)
-        
+
         self.tools = [
             Tool(
                 name="DTC_Lookup",
@@ -539,10 +549,10 @@ class AutomotiveDiagnosticAgent:
                 description="Find required parts and costs"
             )
         ]
-        
+
         self.agent = create_react_agent(self.llm, self.tools, self.prompt_template)
         self.executor = AgentExecutor(agent=self.agent, tools=self.tools)
-    
+
     async def diagnose(self, vehicle_info: dict, dtcs: list, symptoms: str):
         """
         Perform comprehensive diagnostic analysis
@@ -551,7 +561,7 @@ class AutomotiveDiagnosticAgent:
         Vehicle: {vehicle_info['make']} {vehicle_info['model']} {vehicle_info['year']}
         DTCs: {', '.join(dtcs)}
         Symptoms: {symptoms}
-        
+
         Provide:
         1. Root cause analysis
         2. Recommended repairs (prioritized)
@@ -559,10 +569,10 @@ class AutomotiveDiagnosticAgent:
         4. Required tools and parts
         5. Difficulty level
         """
-        
+
         result = await self.executor.ainvoke({"input": query})
         return result
-    
+
     def lookup_dtc(self, code: str) -> str:
         """Retrieve DTC information from knowledge base"""
         docs = self.vectorstore.similarity_search(f"DTC {code}", k=3)
@@ -1181,13 +1191,13 @@ OBDProtocol currentProtocol = AUTO_DETECT;
 void setup() {
     Serial.begin(115200);
     SerialBT.begin("AutoDiagPro_BT");
-    
+
     // Initialize CAN
     CAN.setPins(CAN_RX_PIN, CAN_TX_PIN);
     if (!CAN.begin(CAN_SPEED)) {
         Serial.println("CAN init failed!");
     }
-    
+
     Serial.println("AutoDiagPro Adapter Ready");
 }
 
@@ -1197,7 +1207,7 @@ void loop() {
         String command = SerialBT.readStringUntil('\r');
         handleCommand(command);
     }
-    
+
     // Handle CAN messages
     if (CAN.parsePacket()) {
         handleCANMessage();
@@ -1206,7 +1216,7 @@ void loop() {
 
 void handleCommand(String cmd) {
     cmd.trim();
-    
+
     if (cmd.startsWith("AT")) {
         handleATCommand(cmd);
     } else {
@@ -1233,20 +1243,20 @@ void handleATCommand(String cmd) {
     } else {
         SerialBT.println("?");
     }
-    
+
     SerialBT.print(">");
 }
 
 void handleOBDCommand(String cmd) {
     // Parse OBD command (e.g., "01 00", "03")
     String response = "";
-    
+
     if (currentProtocol == CAN_11B_500K || currentProtocol == CAN_29B_500K) {
         response = sendCANQuery(cmd);
     } else if (currentProtocol == ISO9141 || currentProtocol == KWP2000) {
         response = sendKLineQuery(cmd);
     }
-    
+
     SerialBT.println(response);
     SerialBT.print(">");
 }
@@ -1256,13 +1266,13 @@ String sendCANQuery(String cmd) {
     // Send and wait for response
     // Parse response
     // Return formatted string
-    
+
     // Example for PID 01 00
     if (cmd == "0100") {
         // Mock response - in real implementation, send/receive via CAN
         return "41 00 BE 3E B8 11";
     }
-    
+
     return "NO DATA";
 }
 
@@ -1275,13 +1285,13 @@ String sendKLineQuery(String cmd) {
 void handleCANMessage() {
     int packetId = CAN.packetId();
     int packetLength = CAN.packetDlc();
-    
+
     // Process incoming CAN messages
     uint8_t data[8];
     for (int i = 0; i < packetLength; i++) {
         data[i] = CAN.read();
     }
-    
+
     // Forward to app if needed
 }
 ```
@@ -1297,57 +1307,57 @@ class BluetoothManager @Inject constructor(
     private var bluetoothSocket: BluetoothSocket? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
-    
+
     suspend fun connect(deviceAddress: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
             val uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB") // SPP UUID
-            
+
             bluetoothSocket = device?.createRfcommSocketToServiceRecord(uuid)
             bluetoothSocket?.connect()
-            
+
             inputStream = bluetoothSocket?.inputStream
             outputStream = bluetoothSocket?.outputStream
-            
+
             Result.success(true)
         } catch (e: IOException) {
             Result.failure(e)
         }
     }
-    
+
     suspend fun sendCommand(command: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             outputStream?.write("$command\r".toByteArray())
             outputStream?.flush()
-            
+
             val response = readResponse()
             Result.success(response)
         } catch (e: IOException) {
             Result.failure(e)
         }
     }
-    
+
     private fun readResponse(timeoutMs: Long = 5000): String {
         val buffer = ByteArray(1024)
         val response = StringBuilder()
         val startTime = System.currentTimeMillis()
-        
+
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             if (inputStream?.available() ?: 0 > 0) {
                 val bytesRead = inputStream?.read(buffer) ?: 0
                 val data = String(buffer, 0, bytesRead)
                 response.append(data)
-                
+
                 if (data.contains(">")) {
                     break
                 }
             }
             Thread.sleep(10)
         }
-        
+
         return response.toString().trim()
     }
-    
+
     fun disconnect() {
         try {
             inputStream?.close()
@@ -1364,14 +1374,14 @@ class DiagnosticsViewModel @Inject constructor(
     private val bluetoothManager: BluetoothManager,
     private val obdRepository: OBDRepository
 ) : ViewModel() {
-    
+
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
-    
+
     fun connectToAdapter(deviceAddress: String) {
         viewModelScope.launch {
             _connectionState.value = ConnectionState.Connecting
-            
+
             val result = bluetoothManager.connect(deviceAddress)
             result.onSuccess {
                 _connectionState.value = ConnectionState.Connected
@@ -1381,16 +1391,16 @@ class DiagnosticsViewModel @Inject constructor(
             }
         }
     }
-    
+
     private suspend fun initializeConnection() {
         // Reset adapter
         bluetoothManager.sendCommand("ATZ")
         delay(1000)
-        
+
         // Configure adapter
         bluetoothManager.sendCommand("ATE0")
         bluetoothManager.sendCommand("ATSP0")
-        
+
         // Verify connection
         val result = bluetoothManager.sendCommand("0100")
         if (result.isSuccess) {
@@ -1437,10 +1447,10 @@ class OBDRepositoryTest {
         val mockConnection = mockk<OBDConnection>()
         every { mockConnection.sendCommand("03") } returns "43 01 P0420 P0171"
         val repository = OBDRepository(mockConnection)
-        
+
         // When
         val result = runBlocking { repository.readDTCs() }
-        
+
         // Then
         assertThat(result.isSuccess).isTrue()
         assertThat(result.getOrNull()).hasSize(2)
@@ -1456,27 +1466,27 @@ class OBDRepositoryTest {
 ```kotlin
 @RunWith(AndroidJUnit4::class)
 class HardwareIntegrationTest {
-    
+
     @Before
     fun setup() {
         // Requires real hardware adapter connected
         assumeTrue("Hardware adapter not found", isAdapterConnected())
     }
-    
+
     @Test
     fun testFullDiagnosticsCycle() = runTest {
         // Connect
         val connected = connectToAdapter()
         assertThat(connected).isTrue()
-        
+
         // Read DTCs
         val dtcs = readDTCs()
         assertThat(dtcs).isNotNull()
-        
+
         // Read live data
         val liveData = readPID(PID.ENGINE_RPM)
         assertThat(liveData).isGreaterThan(0)
-        
+
         // Disconnect
         disconnect()
     }
@@ -1488,10 +1498,10 @@ class HardwareIntegrationTest {
 ```kotlin
 @OptIn(ExperimentalTestApi::class)
 class DashboardScreenTest {
-    
+
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
-    
+
     @Test
     fun dashboardDisplaysLiveData() {
         composeTestRule.setContent {
@@ -1499,12 +1509,12 @@ class DashboardScreenTest {
                 viewModel = FakeDashboardViewModel()
             )
         }
-        
+
         // Verify RPM gauge is displayed
         composeTestRule
             .onNodeWithText("RPM")
             .assertIsDisplayed()
-        
+
         // Verify values update
         composeTestRule
             .onNodeWithText("2500")
@@ -1517,7 +1527,7 @@ class DashboardScreenTest {
 
 ```kotlin
 class PerformanceTest {
-    
+
     @Test
     fun measureDatabaseQueryPerformance() {
         val benchmark = measureTimeMillis {
@@ -1525,10 +1535,10 @@ class PerformanceTest {
                 database.dtcDao().searchByCode("P0%")
             }
         }
-        
+
         assertThat(benchmark / 1000).isLessThan(100) // < 100ms average
     }
-    
+
     @Test
     fun measureUIRenderingPerformance() {
         // Use Android Benchmark library
@@ -1546,19 +1556,19 @@ Quality Requirements:
     Unit Tests: ">= 85%"
     Integration Tests: ">= 70%"
     Overall: ">= 80%"
-  
+
   Code Quality:
     Complexity: "< 10 (cyclomatic)"
     Duplication: "< 5%"
     Code Smells: "0 critical"
     Vulnerabilities: "0"
-    
+
   Performance:
     App Launch: "< 2s"
     Memory: "< 500MB"
     Battery: "< 5% per hour"
     APK Size: "< 150MB"
-    
+
   Accessibility:
     WCAG Level: "AA"
     Touch Targets: ">= 48dp"
@@ -1580,43 +1590,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
       - name: Build with Gradle
         run: ./gradlew build
-        
+
       - name: Run Unit Tests
         run: ./gradlew test
-        
+
       - name: Run Lint
         run: ./gradlew lint
-        
+
       - name: Code Coverage
         run: ./gradlew jacocoTestReport
-        
+
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
-        
+
       - name: Static Analysis
         run: ./gradlew detekt
-        
+
       - name: Security Scan
         run: ./gradlew dependencyCheckAnalyze
 
   ui-test:
     runs-on: macos-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Run Instrumented Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -1685,18 +1695,18 @@ async def check_updates(request: UpdateRequest) -> List[UpdatePackage]:
     Check for available updates
     """
     available_updates = []
-    
+
     # Check data updates
     if is_data_update_available(request.data_version):
         update = get_data_update(request.data_version)
         available_updates.append(update)
-    
+
     # Check vehicle database updates
     for vehicle_db in request.vehicle_databases:
         if is_vehicle_update_available(vehicle_db):
             update = get_vehicle_update(vehicle_db)
             available_updates.append(update)
-    
+
     return available_updates
 
 @app.get("/api/v1/updates/download/{update_id}")
@@ -1707,10 +1717,10 @@ async def download_update(update_id: str):
     update = get_update_by_id(update_id)
     if not update:
         raise HTTPException(status_code=404, detail="Update not found")
-    
+
     # Generate temporary signed URL (S3 presigned URL)
     signed_url = generate_signed_url(update.file_path, expires_in=3600)
-    
+
     return {"url": signed_url, "checksum": update.checksum}
 
 @app.post("/api/v1/updates/verify")
@@ -1729,7 +1739,7 @@ class UpdateRepository @Inject constructor(
     private val downloadManager: DownloadManager,
     private val database: AppDatabase
 ) {
-    
+
     suspend fun checkForUpdates(): Result<List<UpdatePackage>> {
         val request = UpdateRequest(
             appVersion = BuildConfig.VERSION_NAME,
@@ -1737,7 +1747,7 @@ class UpdateRepository @Inject constructor(
             vehicleDatabases = getInstalledVehicleDBs(),
             deviceId = getDeviceId()
         )
-        
+
         return try {
             val updates = updateApi.checkUpdates(request)
             Result.success(updates)
@@ -1745,30 +1755,30 @@ class UpdateRepository @Inject constructor(
             Result.failure(e)
         }
     }
-    
+
     suspend fun downloadUpdate(update: UpdatePackage): Flow<DownloadProgress> = flow {
         // Get download URL
         val urlResponse = updateApi.getDownloadUrl(update.id)
-        
+
         // Download with progress
         val file = downloadManager.downloadFile(
             url = urlResponse.url,
             destinationDir = getUpdateDirectory()
         )
-        
+
         file.collect { progress ->
             emit(progress)
         }
-        
+
         // Verify checksum
         val downloadedChecksum = calculateChecksum(progress.file)
         if (downloadedChecksum != update.checksum) {
             throw SecurityException("Checksum verification failed")
         }
-        
+
         emit(DownloadProgress.Completed(progress.file))
     }
-    
+
     suspend fun installUpdate(update: UpdatePackage, file: File): Result<Boolean> {
         return try {
             when (update.type) {
@@ -1778,20 +1788,20 @@ class UpdateRepository @Inject constructor(
                 "firmware" -> installFirmwareUpdate(file)
                 else -> throw IllegalArgumentException("Unknown update type")
             }
-            
+
             // Update version in database
             updateDataVersion(update.type, update.version)
-            
+
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-    
+
     private suspend fun installDTCUpdate(file: File) {
         // Parse update file (JSON/SQLite)
         val dtcs = parseDTCUpdate(file)
-        
+
         // Update database in transaction
         database.withTransaction {
             database.dtcDao().deleteAll()
@@ -1810,7 +1820,7 @@ fun UpdatesScreen(
 ) {
     val updates by viewModel.availableUpdates.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
-    
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Updates") })
@@ -1829,7 +1839,7 @@ fun UpdatesScreen(
             ) {
                 Text("Check for Updates")
             }
-            
+
             LazyColumn {
                 items(updates) { update ->
                     UpdateCard(
@@ -1871,21 +1881,21 @@ fun UpdateCard(
                     Badge { Text("Required") }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "Version: ${update.version}",
                 style = MaterialTheme.typography.bodyMedium
             )
-            
+
             Text(
                 text = "Size: ${formatSize(update.size)}",
                 style = MaterialTheme.typography.bodySmall
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             when (progress) {
                 null -> {
                     Button(

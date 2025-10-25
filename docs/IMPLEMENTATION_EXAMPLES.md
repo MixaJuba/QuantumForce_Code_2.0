@@ -9,6 +9,7 @@
 5. [Features Layer Examples](#features-layer-examples)
 6. [UI Layer Examples](#ui-layer-examples)
 7. [Integration Examples](#integration-examples)
+8. [EV/ADAS Support Examples](#ev-adas-support-examples)
 
 ---
 
@@ -30,13 +31,13 @@ import com.quantumforce_code.core.domain.repository.DtcRepository
 class GetDtcCodesUseCase(
     private val dtcRepository: DtcRepository
 ) : UseCase<GetDtcCodesUseCase.Params, List<DtcCode>>() {
-    
+
     data class Params(
         val vehicleId: String,
         val includeCleared: Boolean = false,
         val filterBySeverity: DtcCode.Severity? = null
     )
-    
+
     override suspend fun execute(parameters: Params): Result<List<DtcCode>> {
         return try {
             // 1. Отримуємо коди з репозиторію
@@ -44,17 +45,17 @@ class GetDtcCodesUseCase(
                 vehicleId = parameters.vehicleId,
                 includeCleared = parameters.includeCleared
             )
-            
+
             // 2. Фільтруємо за severity якщо заданий
             val filteredCodes = parameters.filterBySeverity?.let { severity ->
                 codes.filter { it.severity == severity }
             } ?: codes
-            
+
             // 3. Сортуємо: критичні першими
-            val sortedCodes = filteredCodes.sortedByDescending { 
-                it.severity.ordinal 
+            val sortedCodes = filteredCodes.sortedByDescending {
+                it.severity.ordinal
             }
-            
+
             Result.success(sortedCodes)
         } catch (e: Exception) {
             Result.failure(e)
@@ -66,13 +67,13 @@ class GetDtcCodesUseCase(
 class DtcViewModel(
     private val getDtcCodesUseCase: GetDtcCodesUseCase
 ) : ViewModel() {
-    
+
     fun loadDtcCodes(vehicleId: String) {
         viewModelScope.launch {
             val result = getDtcCodesUseCase(
                 GetDtcCodesUseCase.Params(vehicleId)
             )
-            
+
             result.fold(
                 onSuccess = { codes ->
                     _uiState.update { it.copy(dtcCodes = codes) }
@@ -107,7 +108,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Реалізація DtcRepository.
- * 
+ *
  * Поєднує локальну базу даних (Room) та OBD інтерфейс.
  * Якщо дані є в БД, повертає їх. Інакше читає з автомобіля.
  */
@@ -115,7 +116,7 @@ class DtcRepositoryImpl(
     private val dtcDao: DtcDao,
     private val obdInterface: ObdInterface
 ) : DtcRepository {
-    
+
     override suspend fun getDtcCodes(
         vehicleId: String,
         includeCleared: Boolean
@@ -123,7 +124,7 @@ class DtcRepositoryImpl(
         // Спочатку спробуємо отримати з локальної БД
         val localCodes = dtcDao.getAllDtcCodes()
             .map { it.toDomain() }
-        
+
         // Якщо немає локальних даних, читаємо з автомобіля
         if (localCodes.isEmpty() && obdInterface.isConnected()) {
             val result = obdInterface.readDtcCodes()
@@ -134,14 +135,14 @@ class DtcRepositoryImpl(
                 }
             }
         }
-        
+
         localCodes
     }
-    
+
     override suspend fun getDtcByCode(code: String): DtcCode? = withContext(Dispatchers.IO) {
         dtcDao.getDtcByCode(code)?.toDomain()
     }
-    
+
     override suspend fun saveDtcCode(dtcCode: DtcCode): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             dtcDao.insertDtcCode(dtcCode.toEntity())
@@ -150,28 +151,28 @@ class DtcRepositoryImpl(
             Result.failure(e)
         }
     }
-    
+
     override suspend fun clearDtcCodes(vehicleId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             // Очищаємо коди через OBD
             if (obdInterface.isConnected()) {
                 obdInterface.clearDtcCodes()
             }
-            
+
             // Очищаємо локальну БД
             dtcDao.clearAllDtcCodes()
-            
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-    
+
     override suspend fun searchDtcCodes(query: String): List<DtcCode> = withContext(Dispatchers.IO) {
         dtcDao.searchDtcCodes(query)
             .map { it.toDomain() }
     }
-    
+
     // Інші методи...
 }
 ```
@@ -190,7 +191,7 @@ import kotlinx.serialization.decodeFromString
 
 object DataMappers {
     private val json = Json { ignoreUnknownKeys = true }
-    
+
     /**
      * Конвертує DtcEntity (database) в DtcCode (domain).
      */
@@ -203,12 +204,12 @@ object DataMappers {
             solutions = json.decodeFromString(solutions),
             affectedSystems = json.decodeFromString(affectedSystems),
             timestamp = timestamp,
-            freezeFrame = freezeFrame?.let { 
-                json.decodeFromString<DtcCode.FreezeFrame>(it) 
+            freezeFrame = freezeFrame?.let {
+                json.decodeFromString<DtcCode.FreezeFrame>(it)
             }
         )
     }
-    
+
     /**
      * Конвертує DtcCode (domain) в DtcEntity (database).
      */
@@ -221,8 +222,8 @@ object DataMappers {
             solutions = json.encodeToString(solutions),
             affectedSystems = json.encodeToString(affectedSystems),
             timestamp = timestamp,
-            freezeFrame = freezeFrame?.let { 
-                json.encodeToString(it) 
+            freezeFrame = freezeFrame?.let {
+                json.encodeToString(it)
             }
         )
     }
@@ -256,35 +257,35 @@ class BluetoothPort(
     private val device: BluetoothDevice,
     private val context: Context
 ) : Port {
-    
+
     private var socket: BluetoothSocket? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
-    
+
     companion object {
         // UUID для Bluetooth SPP
         private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     }
-    
+
     override suspend fun open(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             // Створюємо RFCOMM socket
             socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            
+
             // Підключаємося (блокуюча операція)
             socket?.connect()
-            
+
             // Отримуємо streams
             inputStream = socket?.inputStream
             outputStream = socket?.outputStream
-            
+
             Result.success(true)
         } catch (e: IOException) {
             close()
             Result.failure(e)
         }
     }
-    
+
     override suspend fun close() = withContext(Dispatchers.IO) {
         try {
             outputStream?.close()
@@ -298,7 +299,7 @@ class BluetoothPort(
             socket = null
         }
     }
-    
+
     override suspend fun write(data: ByteArray): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             outputStream?.write(data)
@@ -308,12 +309,12 @@ class BluetoothPort(
             Result.failure(e)
         }
     }
-    
+
     override suspend fun read(timeout: Long): Result<ByteArray> = withContext(Dispatchers.IO) {
         try {
             val buffer = ByteArray(1024)
             val startTime = System.currentTimeMillis()
-            
+
             // Чекаємо дані з таймаутом
             while (inputStream?.available() == 0) {
                 if (System.currentTimeMillis() - startTime > timeout) {
@@ -321,14 +322,14 @@ class BluetoothPort(
                 }
                 Thread.sleep(10)
             }
-            
+
             val bytesRead = inputStream?.read(buffer) ?: 0
             Result.success(buffer.copyOf(bytesRead))
         } catch (e: IOException) {
             Result.failure(e)
         }
     }
-    
+
     override suspend fun flush(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             // Читаємо всі доступні дані
@@ -340,10 +341,10 @@ class BluetoothPort(
             Result.failure(e)
         }
     }
-    
+
     override val isConnected: Boolean
         get() = socket?.isConnected == true
-    
+
     override val info: Port.PortInfo
         get() = Port.PortInfo(
             type = Port.PortType.BLUETOOTH,
@@ -373,28 +374,28 @@ import kotlinx.coroutines.flow.asStateFlow
 class ConnectionManagerImpl(
     private val context: Context
 ) : ConnectionManager {
-    
+
     private var currentPort: Port? = null
     private var currentConfig: ConnectionManager.ConnectionConfig? = null
-    
+
     private val _connectionState = MutableStateFlow<ConnectionManager.ConnectionState>(
         ConnectionManager.ConnectionState.Disconnected
     )
-    override val connectionState: StateFlow<ConnectionManager.ConnectionState> = 
+    override val connectionState: StateFlow<ConnectionManager.ConnectionState> =
         _connectionState.asStateFlow()
-    
+
     private var autoReconnectEnabled = false
     private var maxReconnectAttempts = 3
     private var reconnectDelay = 2000L
-    
+
     override suspend fun connect(config: ConnectionManager.ConnectionConfig): Result<Port> {
         // Закриваємо попереднє з'єднання якщо є
         disconnect()
-        
+
         _connectionState.value = ConnectionManager.ConnectionState.Connecting(
             config.name ?: config.address
         )
-        
+
         val port = when (config.type) {
             Port.PortType.BLUETOOTH -> {
                 createBluetoothPort(config.address)
@@ -409,7 +410,7 @@ class ConnectionManagerImpl(
                 createMockPort()
             }
         }
-        
+
         return port?.let { p ->
             val result = p.open()
             if (result.isSuccess) {
@@ -429,37 +430,37 @@ class ConnectionManagerImpl(
             }
         } ?: Result.failure(Exception("Failed to create port"))
     }
-    
+
     override suspend fun disconnect() {
         currentPort?.close()
         currentPort = null
         currentConfig = null
         _connectionState.value = ConnectionManager.ConnectionState.Disconnected
     }
-    
+
     override fun getCurrentPort(): Port? = currentPort
-    
+
     override fun getCurrentConfig(): ConnectionManager.ConnectionConfig? = currentConfig
-    
+
     override suspend fun scanDevices(): List<ConnectionManager.DeviceInfo> {
         val devices = mutableListOf<ConnectionManager.DeviceInfo>()
-        
+
         // Bluetooth devices
         devices.addAll(scanBluetoothDevices())
-        
+
         // USB devices
         devices.addAll(scanUsbDevices())
-        
+
         // TCP devices (можна сканувати локальну мережу)
         // devices.addAll(scanTcpDevices())
-        
+
         return devices
     }
-    
+
     private fun scanBluetoothDevices(): List<ConnectionManager.DeviceInfo> {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val adapter = bluetoothManager?.adapter ?: return emptyList()
-        
+
         return adapter.bondedDevices.map { device ->
             ConnectionManager.DeviceInfo(
                 name = device.name ?: "Unknown",
@@ -470,14 +471,14 @@ class ConnectionManagerImpl(
             )
         }
     }
-    
+
     private fun createBluetoothPort(address: String): Port? {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val adapter = bluetoothManager?.adapter ?: return null
         val device = adapter.getRemoteDevice(address)
         return BluetoothPort(device, context)
     }
-    
+
     // Інші методи...
 }
 ```
@@ -501,32 +502,32 @@ import kotlinx.coroutines.delay
 class Elm327Adapter(
     private val port: Port
 ) : ObdInterface {
-    
+
     private var currentProtocol: ObdProtocol? = null
     private var isInitialized = false
-    
+
     override suspend fun initialize(): Result<Boolean> {
         if (!port.isConnected) {
             return Result.failure(Exception("Port not connected"))
         }
-        
+
         try {
             // 1. Скидаємо адаптер
             sendRawCommand("ATZ")
             delay(1000) // Чекаємо ініціалізацію
-            
+
             // 2. Вимикаємо echo
             sendRawCommand("ATE0")
-            
+
             // 3. Вимикаємо заголовки
             sendRawCommand("ATH0")
-            
+
             // 4. Вимикаємо spaces
             sendRawCommand("ATS0")
-            
+
             // 5. Вимикаємо line feeds
             sendRawCommand("ATL0")
-            
+
             // 6. Автоматичне визначення протоколу
             val protocolResult = detectProtocol()
             if (protocolResult.isSuccess) {
@@ -534,18 +535,18 @@ class Elm327Adapter(
                 isInitialized = true
                 return Result.success(true)
             }
-            
+
             return Result.failure(Exception("Failed to detect protocol"))
         } catch (e: Exception) {
             return Result.failure(e)
         }
     }
-    
+
     override suspend fun sendCommand(command: ObdCommand): Result<ObdResponse> {
         if (!isInitialized) {
             return Result.failure(Exception("Adapter not initialized"))
         }
-        
+
         try {
             val rawResponse = sendRawCommand(command.command)
             return parseResponse(rawResponse, command)
@@ -559,24 +560,24 @@ class Elm327Adapter(
             )
         }
     }
-    
+
     override suspend fun readDtcCodes(): Result<List<String>> {
         val response = sendCommand(ObdCommand.ReadDTC)
-        
+
         if (response.isFailure) {
             return Result.failure(response.exceptionOrNull()!!)
         }
-        
+
         val obdResponse = response.getOrNull()!!
         if (!obdResponse.isSuccess()) {
             return Result.success(emptyList())
         }
-        
+
         // Парсимо коди з відповіді
         val codes = parseDtcCodes(obdResponse.rawData)
         return Result.success(codes)
     }
-    
+
     override suspend fun clearDtcCodes(): Result<Boolean> {
         val response = sendCommand(ObdCommand.ClearDTC)
         return if (response.isSuccess && response.getOrNull()?.isSuccess() == true) {
@@ -585,15 +586,15 @@ class Elm327Adapter(
             Result.failure(Exception("Failed to clear DTCs"))
         }
     }
-    
+
     override suspend fun readPid(pid: String): Result<ObdInterface.PidData> {
         val command = ObdCommand.Custom("01$pid")
         val response = sendCommand(command)
-        
+
         if (response.isFailure || !response.getOrNull()!!.isSuccess()) {
             return Result.failure(Exception("Failed to read PID"))
         }
-        
+
         val obdResponse = response.getOrNull()!!
         return Result.success(
             ObdInterface.PidData(
@@ -604,17 +605,17 @@ class Elm327Adapter(
             )
         )
     }
-    
+
     override suspend fun detectProtocol(): Result<ObdProtocol> {
         // Спробуємо автоматичне визначення
         sendRawCommand("ATSP0")
-        
+
         // Відправимо тестову команду
         val testResponse = sendRawCommand("0100")
-        
+
         // Запитаємо який протокол визначився
         val protocolResponse = sendRawCommand("ATDPN")
-        
+
         val protocol = when (protocolResponse.trim()) {
             "6" -> ObdProtocol.ISO_15765_4_CAN_11BIT_500K
             "7" -> ObdProtocol.ISO_15765_4_CAN_29BIT_500K
@@ -625,44 +626,44 @@ class Elm327Adapter(
             "5" -> ObdProtocol.ISO_14230_4_KWP_FAST
             else -> return Result.failure(Exception("Unknown protocol"))
         }
-        
+
         return Result.success(protocol)
     }
-    
+
     override fun isConnected(): Boolean {
         return port.isConnected && isInitialized
     }
-    
+
     override suspend fun close() {
         port.close()
         isInitialized = false
     }
-    
+
     /**
      * Відправляє сиру команду до адаптера.
      */
     private suspend fun sendRawCommand(command: String): String {
         // Очищаємо буфер
         port.flush()
-        
+
         // Відправляємо команду з \r
         val data = "$command\r".toByteArray()
         val writeResult = port.write(data)
-        
+
         if (writeResult.isFailure) {
             throw writeResult.exceptionOrNull()!!
         }
-        
+
         // Читаємо відповідь
         val readResult = port.read(timeout = 2000)
         if (readResult.isFailure) {
             throw readResult.exceptionOrNull()!!
         }
-        
+
         val response = readResult.getOrNull()!!.toString(Charsets.US_ASCII)
         return response.trim().replace(">", "")
     }
-    
+
     /**
      * Парсить відповідь OBD у ObdResponse.
      */
@@ -678,7 +679,7 @@ class Elm327Adapter(
                 return Result.success(ObdResponse.error(rawData, ObdResponse.Status.TIMEOUT, command))
             }
         }
-        
+
         // Парсимо успішну відповідь
         // Тут має бути логіка парсингу залежно від команди
         return Result.success(
@@ -689,18 +690,18 @@ class Elm327Adapter(
             )
         )
     }
-    
+
     private fun parseDtcCodes(rawData: String): List<String> {
         // Парсимо DTC коди з hex відповіді
         // Формат: 43 01 03 01 04 (кількість кодів + hex коди)
         val codes = mutableListOf<String>()
-        
+
         // Видаляємо пробіли та розбиваємо на байти
         val bytes = rawData.replace(" ", "").chunked(2)
-        
+
         // Перший байт після "43" - кількість кодів
         // Далі йдуть коди по 2 байти кожен
-        
+
         // Спрощена логіка:
         for (i in 2 until bytes.size step 2) {
             val code = convertDtcBytes(bytes[i], bytes[i + 1])
@@ -708,15 +709,15 @@ class Elm327Adapter(
                 codes.add(code)
             }
         }
-        
+
         return codes
     }
-    
+
     private fun convertDtcBytes(byte1: String, byte2: String): String {
         // Конвертує 2 hex байти в DTC код (P0301 формат)
         val firstByte = byte1.toInt(16)
         val secondByte = byte2.toInt(16)
-        
+
         val prefix = when ((firstByte shr 6) and 0x03) {
             0 -> "P"
             1 -> "C"
@@ -724,15 +725,15 @@ class Elm327Adapter(
             3 -> "U"
             else -> "P"
         }
-        
+
         val digit1 = (firstByte shr 4) and 0x03
         val digit2 = firstByte and 0x0F
         val digit3 = (secondByte shr 4) and 0x0F
         val digit4 = secondByte and 0x0F
-        
+
         return "$prefix$digit1$digit2$digit3$digit4"
     }
-    
+
     private fun getPidName(pid: String): String {
         return when (pid) {
             "0C" -> "Engine RPM"
@@ -768,7 +769,7 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel для екрану DTC діагностики.
- * 
+ *
  * Відповідає за:
  * - Управління станом UI
  * - Виклик use cases
@@ -779,26 +780,26 @@ class DtcViewModel(
     private val clearDtcCodesUseCase: ClearDtcCodesUseCase,
     private val connectionManager: ConnectionManager
 ) : ViewModel() {
-    
+
     // UI State
     private val _uiState = MutableStateFlow(DtcUiState())
     val uiState: StateFlow<DtcUiState> = _uiState.asStateFlow()
-    
+
     // UI Effects (одноразові події)
     private val _effects = MutableSharedFlow<DtcEffect>()
     val effects: SharedFlow<DtcEffect> = _effects.asSharedFlow()
-    
+
     init {
         // Підписуємося на зміни стану з'єднання
         viewModelScope.launch {
             connectionManager.connectionState.collect { state ->
-                _uiState.update { 
-                    it.copy(connectionStatus = state.toConnectionStatus()) 
+                _uiState.update {
+                    it.copy(connectionStatus = state.toConnectionStatus())
                 }
             }
         }
     }
-    
+
     /**
      * Обробляє події з UI.
      */
@@ -812,63 +813,63 @@ class DtcViewModel(
             is DtcEvent.FilterBySeverity -> filterBySeverity(event.severity)
         }
     }
-    
+
     private fun loadDtcCodes() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
+
             val vehicleId = _uiState.value.selectedVehicle?.id
             if (vehicleId == null) {
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isLoading = false,
                         error = "Виберіть автомобіль"
-                    ) 
+                    )
                 }
                 _effects.emit(DtcEffect.ShowToast("Виберіть автомобіль"))
                 return@launch
             }
-            
+
             val result = getDtcCodesUseCase(
                 GetDtcCodesUseCase.Params(
                     vehicleId = vehicleId,
                     filterBySeverity = _uiState.value.selectedSeverityFilter
                 )
             )
-            
+
             result.fold(
                 onSuccess = { codes ->
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             isLoading = false,
                             dtcCodes = codes,
                             error = null
-                        ) 
+                        )
                     }
-                    
+
                     if (codes.isEmpty()) {
                         _effects.emit(DtcEffect.ShowToast("Коди помилок не знайдено"))
                     }
                 },
                 onFailure = { error ->
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             isLoading = false,
                             error = error.message
-                        ) 
+                        )
                     }
                     _effects.emit(DtcEffect.ShowToast("Помилка: ${error.message}"))
                 }
             )
         }
     }
-    
+
     private fun clearDtcCodes() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            
+
             val vehicleId = _uiState.value.selectedVehicle?.id ?: return@launch
-            
+
             clearDtcCodesUseCase(
                 ClearDtcCodesUseCase.Params(vehicleId = vehicleId)
             ).fold(
@@ -877,18 +878,18 @@ class DtcViewModel(
                     loadDtcCodes() // Перезавантажуємо список
                 },
                 onFailure = { error ->
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             isLoading = false,
                             error = error.message
-                        ) 
+                        )
                     }
                     _effects.emit(DtcEffect.ShowToast("Помилка очищення: ${error.message}"))
                 }
             )
         }
     }
-    
+
     private fun refreshConnection() {
         viewModelScope.launch {
             val port = connectionManager.getCurrentPort()
@@ -904,22 +905,22 @@ class DtcViewModel(
             }
         }
     }
-    
+
     private fun selectVehicle(vehicle: Vehicle) {
         _uiState.update { it.copy(selectedVehicle = vehicle) }
     }
-    
+
     private fun showDtcDetails(code: DtcCode) {
         viewModelScope.launch {
             _effects.emit(DtcEffect.NavigateToDetails(code))
         }
     }
-    
+
     private fun filterBySeverity(severity: DtcCode.Severity?) {
         _uiState.update { it.copy(selectedSeverityFilter = severity) }
         loadDtcCodes() // Перезавантажуємо з фільтром
     }
-    
+
     private fun ConnectionManager.ConnectionState.toConnectionStatus(): DtcUiState.ConnectionStatus {
         return when (this) {
             is ConnectionManager.ConnectionState.Connected -> DtcUiState.ConnectionStatus.CONNECTED
@@ -1005,7 +1006,7 @@ fun DtcScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     // Обробка ефектів
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
@@ -1022,7 +1023,7 @@ fun DtcScreen(
             }
         }
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1052,7 +1053,7 @@ fun DtcScreen(
                     viewModel.handleEvent(DtcEvent.FilterBySeverity(severity))
                 }
             )
-            
+
             when {
                 uiState.isLoading -> {
                     Box(
@@ -1127,14 +1128,14 @@ private fun DtcCodeCard(
                 )
                 SeverityBadge(severity = dtcCode.severity)
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = dtcCode.description,
                 style = MaterialTheme.typography.bodyMedium
             )
-            
+
             if (dtcCode.affectedSystems.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -1158,7 +1159,7 @@ private fun SeverityBadge(
         DtcCode.Severity.MEDIUM -> "Середній" to MaterialTheme.colorScheme.primaryContainer
         DtcCode.Severity.LOW -> "Низький" to MaterialTheme.colorScheme.surfaceVariant
     }
-    
+
     Surface(
         color = color,
         shape = MaterialTheme.shapes.small,
@@ -1238,7 +1239,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    
+
     @Provides
     @Singleton
     fun provideAppDatabase(
@@ -1246,7 +1247,7 @@ object AppModule {
     ): AppDatabase {
         return AppDatabase.create(context)
     }
-    
+
     @Provides
     @Singleton
     fun provideConnectionManager(
@@ -1254,7 +1255,7 @@ object AppModule {
     ): ConnectionManager {
         return ConnectionManagerImpl(context)
     }
-    
+
     @Provides
     fun provideObdInterface(
         connectionManager: ConnectionManager
@@ -1263,7 +1264,7 @@ object AppModule {
             ?: throw IllegalStateException("No active connection")
         return Elm327Adapter(port)
     }
-    
+
     @Provides
     fun provideDtcRepository(
         database: AppDatabase,
@@ -1274,19 +1275,434 @@ object AppModule {
             obdInterface = obdInterface
         )
     }
-    
+
     @Provides
     fun provideGetDtcCodesUseCase(
         dtcRepository: DtcRepository
     ): GetDtcCodesUseCase {
         return GetDtcCodesUseCase(dtcRepository)
     }
-    
+
     @Provides
     fun provideClearDtcCodesUseCase(
         dtcRepository: DtcRepository
     ): ClearDtcCodesUseCase {
         return ClearDtcCodesUseCase(dtcRepository)
+    }
+}
+```
+
+## 8️⃣ EV/ADAS Support Examples
+
+### EV Battery Diagnostics UseCase
+
+```kotlin
+// AnalyzeEvBatteryUseCase.kt
+package com.quantumforce_code.core.domain.usecase
+
+import com.quantumforce_code.core.domain.UseCase
+import com.quantumforce_code.core.domain.repository.EvRepository
+
+/**
+ * Use Case для аналізу стану батареї електромобіля.
+ * Використовує AI для прогнозування стану батареї (SoH).
+ */
+class AnalyzeEvBatteryUseCase(
+    private val evRepository: EvRepository,
+    private val aiEngine: AiEngine // AI для аналізу
+) : UseCase<AnalyzeEvBatteryUseCase.Params, EvBatteryAnalysis>() {
+
+    data class Params(
+        val vehicleId: String,
+        val includeHistoricalData: Boolean = true
+    )
+
+    override suspend fun execute(parameters: Params): Result<EvBatteryAnalysis> {
+        return try {
+            // Отримуємо поточні дані батареї
+            val currentData = evRepository.getBatteryData(parameters.vehicleId)
+
+            // Отримуємо історичні дані якщо потрібно
+            val historicalData = if (parameters.includeHistoricalData) {
+                evRepository.getBatteryHistory(parameters.vehicleId, last30Days())
+            } else emptyList()
+
+            // AI аналіз стану батареї
+            val aiAnalysis = aiEngine.analyzeBatteryHealth(
+                currentData = currentData,
+                historicalData = historicalData
+            )
+
+            val analysis = EvBatteryAnalysis(
+                currentVoltage = currentData.voltage,
+                currentCapacity = currentData.capacity,
+                stateOfHealth = aiAnalysis.stateOfHealth,
+                predictedDegradation = aiAnalysis.predictedDegradation,
+                recommendations = aiAnalysis.recommendations,
+                riskLevel = aiAnalysis.riskLevel
+            )
+
+            Result.success(analysis)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun last30Days(): DateRange {
+        // Логіка для визначення діапазону останніх 30 днів
+    }
+}
+
+// Domain entities для EV
+data class EvBatteryAnalysis(
+    val currentVoltage: Double,
+    val currentCapacity: Double,
+    val stateOfHealth: Double, // 0-100%
+    val predictedDegradation: Double, // % на рік
+    val recommendations: List<String>,
+    val riskLevel: RiskLevel
+)
+
+enum class RiskLevel {
+    LOW, MEDIUM, HIGH, CRITICAL
+}
+```
+
+### ADAS Calibration Module
+
+```kotlin
+// AdasCalibrationUseCase.kt
+package com.quantumforce_code.core.domain.usecase
+
+import com.quantumforce_code.core.domain.UseCase
+import com.quantumforce_code.core.domain.repository.AdasRepository
+
+/**
+ * Use Case для калібрування ADAS систем.
+ * Підтримує камери, радари та інші сенсори.
+ */
+class CalibrateAdasSystemUseCase(
+    private val adasRepository: AdasRepository,
+    private val connectionManager: ConnectionManager
+) : UseCase<CalibrateAdasSystemUseCase.Params, AdasCalibrationResult>() {
+
+    data class Params(
+        val systemType: AdasSystemType,
+        val calibrationMode: CalibrationMode = CalibrationMode.STATIC,
+        val targetValues: Map<String, Double>? = null
+    )
+
+    override suspend fun execute(parameters: Params): Result<AdasCalibrationResult> {
+        return try {
+            // Перевіряємо з'єднання
+            if (!connectionManager.isConnected()) {
+                return Result.failure(Exception("No vehicle connection"))
+            }
+
+            // Ініціалізуємо калібрування
+            val initResult = adasRepository.initializeCalibration(parameters.systemType)
+            if (initResult.isFailure) {
+                return Result.failure(initResult.exceptionOrNull()!!)
+            }
+
+            // Виконуємо калібрування залежно від типу системи
+            val calibrationResult = when (parameters.systemType) {
+                AdasSystemType.CAMERA -> calibrateCamera(parameters)
+                AdasSystemType.RADAR -> calibrateRadar(parameters)
+                AdasSystemType.LIDAR -> calibrateLidar(parameters)
+                AdasSystemType.ULTRASONIC -> calibrateUltrasonic(parameters)
+            }
+
+            // Зберігаємо результати калібрування
+            adasRepository.saveCalibrationResult(calibrationResult)
+
+            Result.success(calibrationResult)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun calibrateCamera(params: Params): AdasCalibrationResult {
+        // Логіка калібрування камери
+        // Включає перевірку кута огляду, фокусування, освітлення
+    }
+
+    private suspend fun calibrateRadar(params: Params): AdasCalibrationResult {
+        // Логіка калібрування радару
+        // Включає перевірку діапазону, точності, мертвих зон
+    }
+
+    // Інші методи калібрування...
+}
+
+enum class AdasSystemType {
+    CAMERA, RADAR, LIDAR, ULTRASONIC, NIGHT_VISION
+}
+
+enum class CalibrationMode {
+    STATIC, DYNAMIC, ADAPTIVE
+}
+
+data class AdasCalibrationResult(
+    val systemType: AdasSystemType,
+    val success: Boolean,
+    val calibrationData: Map<String, Any>,
+    val errorCodes: List<String> = emptyList(),
+    val recommendations: List<String> = emptyList()
+)
+```
+
+### EV Protocol Adapter (UDS over CAN)
+
+```kotlin
+// UdsOverCanAdapter.kt
+package com.quantumforce_code.protocols.ev
+
+import com.quantumforce_code.hardware.transport.Port
+import com.quantumforce_code.protocols.obd.ObdProtocol
+
+/**
+ * Реалізація UDS протоколу поверх CAN шини для EV діагностики.
+ * Підтримує діагностику високовольтних систем.
+ */
+class UdsOverCanAdapter(
+    private val port: Port,
+    private val canConfig: CanConfiguration
+) : EvProtocol {
+
+    private var sessionEstablished = false
+
+    override suspend fun initialize(): Result<Boolean> {
+        try {
+            // Встановлюємо CAN конфігурацію
+            configureCanBus(canConfig)
+
+            // Встановлюємо діагностичну сесію
+            val sessionResult = establishDiagnosticSession()
+            if (sessionResult.isSuccess) {
+                sessionEstablished = true
+                return Result.success(true)
+            }
+
+            return Result.failure(Exception("Failed to establish diagnostic session"))
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+    }
+
+    override suspend fun readBatteryVoltage(): Result<Double> {
+        if (!sessionEstablished) {
+            return Result.failure(Exception("Session not established"))
+        }
+
+        val response = sendUdsRequest(
+            serviceId = 0x22, // Read Data By Identifier
+            did = 0x1234 // Battery Voltage DID
+        )
+
+        return parseVoltageResponse(response)
+    }
+
+    override suspend fun readBatteryTemperature(): Result<List<Double>> {
+        val response = sendUdsRequest(
+            serviceId = 0x22,
+            did = 0x5678 // Battery Temperature Array DID
+        )
+
+        return parseTemperatureResponse(response)
+    }
+
+    override suspend fun readStateOfCharge(): Result<Double> {
+        val response = sendUdsRequest(
+            serviceId = 0x22,
+            did = 0x9ABC // State of Charge DID
+        )
+
+        return parseSocResponse(response)
+    }
+
+    override suspend fun performBatteryTest(): Result<BatteryTestResult> {
+        // Активний тест батареї через UDS
+        val testResponse = sendUdsRequest(
+            serviceId = 0x31, // Routine Control
+            routineId = 0x0201, // Battery Test Routine
+            controlType = 0x01 // Start Routine
+        )
+
+        return parseBatteryTestResult(testResponse)
+    }
+
+    private suspend fun sendUdsRequest(
+        serviceId: Int,
+        did: Int? = null,
+        routineId: Int? = null,
+        controlType: Int? = null
+    ): ByteArray {
+        // Формуємо UDS повідомлення
+        val message = buildUdsMessage(serviceId, did, routineId, controlType)
+
+        // Відправляємо через CAN
+        port.write(message)
+
+        // Читаємо відповідь
+        val response = port.read(timeout = 5000)
+        return response.getOrNull() ?: ByteArray(0)
+    }
+
+    private fun buildUdsMessage(
+        serviceId: Int,
+        did: Int?,
+        routineId: Int?,
+        controlType: Int?
+    ): ByteArray {
+        // Логіка побудови UDS CAN повідомлення
+        // Включає CAN ID, PCI байт, service ID, параметри
+    }
+
+    private fun parseVoltageResponse(response: ByteArray): Result<Double> {
+        // Парсинг напруги з UDS відповіді
+    }
+
+    private fun parseTemperatureResponse(response: ByteArray): Result<List<Double>> {
+        // Парсинг температур з UDS відповіді
+    }
+
+    // Інші методи парсингу...
+}
+
+data class CanConfiguration(
+    val bitrate: Int = 500000,
+    val samplePoint: Double = 0.875,
+    val sjw: Int = 1,
+    val diagnosticCanId: Int = 0x7DF,
+    val responseCanId: Int = 0x7E8
+)
+
+data class BatteryTestResult(
+    val testPassed: Boolean,
+    val testDuration: Long,
+    val measuredValues: Map<String, Double>,
+    val errorCodes: List<String>
+)
+```
+
+### ADAS Calibration UI
+
+```kotlin
+// AdasCalibrationScreen.kt
+@Composable
+fun AdasCalibrationScreen(
+    viewModel: AdasCalibrationViewModel,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Калібрування ADAS") },
+                actions = {
+                    IconButton(onClick = { viewModel.handleEvent(AdasEvent.ShowHelp) }) {
+                        Icon(Icons.Default.Help, "Допомога")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Вибір системи
+            AdasSystemSelector(
+                systems = uiState.availableSystems,
+                selectedSystem = uiState.selectedSystem,
+                onSystemSelected = { system ->
+                    viewModel.handleEvent(AdasEvent.SelectSystem(system))
+                }
+            )
+
+            // Попередження безпеки
+            SafetyWarningCard()
+
+            // Статус калібрування
+            CalibrationStatusCard(uiState.calibrationStatus)
+
+            // Кнопки керування
+            CalibrationControls(
+                isCalibrating = uiState.isCalibrating,
+                canStart = uiState.canStartCalibration,
+                onStartCalibration = {
+                    viewModel.handleEvent(AdasEvent.StartCalibration)
+                },
+                onStopCalibration = {
+                    viewModel.handleEvent(AdasEvent.StopCalibration)
+                }
+            )
+
+            // Результати
+            if (uiState.calibrationResult != null) {
+                CalibrationResultCard(uiState.calibrationResult!!)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdasSystemSelector(
+    systems: List<AdasSystemType>,
+    selectedSystem: AdasSystemType?,
+    onSystemSelected: (AdasSystemType) -> Unit
+) {
+    Card {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Оберіть систему для калібрування", style = MaterialTheme.typography.titleMedium)
+
+            systems.forEach { system ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSystemSelected(system) }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = system == selectedSystem,
+                        onClick = { onSystemSelected(system) }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(system.displayName)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SafetyWarningCard() {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Warning,
+                "Попередження",
+                tint = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Переконайтеся, що автомобіль припаркований на рівній поверхні та немає перешкод",
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
     }
 }
 ```
